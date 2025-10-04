@@ -1,4 +1,5 @@
 🚀 MyProject Generator
+
 CLI tool tự động tạo boilerplate cho dự án Fullstack (Express + React + Vite)
 Một công cụ dòng lệnh mạnh mẽ giúp bạn khởi tạo dự án fullstack hoàn chỉnh chỉ trong vài giây, bao gồm cả backend (Express + MongoDB) và frontend (React + Vite) với cấu trúc thư mục chuẩn và code mẫu sẵn sàng.
 
@@ -265,10 +266,8 @@ Best practices
 - 🧪 Viết tests cho code của bạn
 - 🔄 Dùng Git từ đầu: git init
 
-```html
 <div align="center">
   <strong>Happy Coding! 🚀</strong>
   <br />
   <sub>Built with ❤️ using Node.js</sub>
 </div>
-```
