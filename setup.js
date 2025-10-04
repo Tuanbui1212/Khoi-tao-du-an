@@ -1,24 +1,62 @@
 #!/usr/bin/env node
 import { execSync } from "child_process";
-import { createRequire } from "module";
 import path from "path";
-const require = createRequire(import.meta.url);
+import { fileURLToPath } from "url";
+import fs from "fs";
 
-function safeImport(pkg) {
-  try {
-    return require(pkg);
-  } catch {
-    console.log(`⚙️  Chưa có ${pkg} → đang cài đặt...`);
-    execSync(`npm install ${pkg}`, { stdio: "inherit" });
-    return require(pkg);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ============ AUTO SETUP PACKAGE.JSON ============
+const packageJsonPath = path.join(__dirname, "package.json");
+const packageJsonContent = {
+  name: "myproject-generator",
+  version: "1.0.0",
+  type: "module",
+  description: "Fullstack project generator",
+  main: "setup.js",
+  dependencies: {
+    chalk: "4.1.2",
+    inquirer: "8.2.5",
+    "fs-extra": "11.2.0",
+  },
+};
+
+if (!fs.existsSync(packageJsonPath)) {
+  console.log("📦 Tạo package.json...");
+  fs.writeFileSync(
+    packageJsonPath,
+    JSON.stringify(packageJsonContent, null, 2)
+  );
+} else {
+  // Cập nhật type: module nếu thiếu
+  const existing = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+  if (existing.type !== "module") {
+    existing.type = "module";
+    fs.writeFileSync(packageJsonPath, JSON.stringify(existing, null, 2));
+    console.log("✅ Đã thêm 'type: module' vào package.json");
   }
 }
 
-const fs = safeImport("fs-extra");
+// Kiểm tra và cài dependencies
+const nodeModulesPath = path.join(__dirname, "node_modules");
+if (
+  !fs.existsSync(nodeModulesPath) ||
+  !fs.existsSync(path.join(nodeModulesPath, "chalk")) ||
+  !fs.existsSync(path.join(nodeModulesPath, "inquirer")) ||
+  !fs.existsSync(path.join(nodeModulesPath, "fs-extra"))
+) {
+  console.log("📦 Đang cài đặt dependencies...");
+  execSync("npm install", { stdio: "inherit", cwd: __dirname });
+  console.log("✅ Hoàn tất cài đặt\n");
+}
+
+// ============ IMPORT DEPENDENCIES ============
+import fsExtra from "fs-extra";
 import chalk from "chalk";
 import inquirer from "inquirer";
 
-const __dirname = process.cwd();
+const projectCwd = process.cwd();
 
 async function main() {
   console.log(chalk.green("🚀 MyProject Project Generator\n"));
@@ -31,13 +69,14 @@ async function main() {
     },
   ]);
 
-  const projectPath = path.join(__dirname, projectName);
-  await fs.ensureDir(projectPath);
+  const projectPath = path.join(projectCwd, projectName);
+  await fsExtra.ensureDir(projectPath);
 
   console.log(chalk.cyan("📁 Đang tạo cấu trúc thư mục..."));
 
   // Danh sách thư mục
   const folders = [
+    // Backend folders
     "backend/src/app/controllers",
     "backend/src/app/middlewares",
     "backend/src/app/models",
@@ -45,6 +84,7 @@ async function main() {
     "backend/src/config/db",
     "backend/src/utils",
 
+    // Frontend folders
     "frontend/src/assets/font",
     "frontend/src/assets/images",
     "frontend/src/components/GlobalStyles",
@@ -54,12 +94,13 @@ async function main() {
     "frontend/src/components/Layout/components/Header",
     "frontend/src/pages",
     "frontend/src/pages/Home",
+    "frontend/src/pages/About", // ← THÊM DÒNG NÀY
     "frontend/src/routes",
     "frontend/src/utils",
   ];
 
   for (const folder of folders) {
-    await fs.ensureDir(path.join(projectPath, folder));
+    await fsExtra.ensureDir(path.join(projectPath, folder));
   }
 
   console.log(chalk.green("✅ Thư mục đã tạo xong."));
@@ -108,13 +149,13 @@ async function setupEnvironment(projectPath) {
 
     // 🧠 Thêm script "start" và "dev" tự động
     const backendPkgPath = path.join(projectPath, "backend", "package.json");
-    const backendPkg = fs.readJsonSync(backendPkgPath);
+    const backendPkg = fsExtra.readJsonSync(backendPkgPath);
 
     backendPkg.scripts = backendPkg.scripts || {};
     backendPkg.scripts.start = "nodemon --inspect ./src/index.js";
     backendPkg.scripts.dev = "nodemon ./src/index.js";
 
-    fs.writeJsonSync(backendPkgPath, backendPkg, { spaces: 2 });
+    fsExtra.writeJsonSync(backendPkgPath, backendPkg, { spaces: 2 });
 
     console.log(
       chalk.green("✅ Đã thêm script start & dev vào backend/package.json")
@@ -469,12 +510,7 @@ function GlobalStyles({ children }) {
 export default GlobalStyles;
 `;
 
-  const globalStylesScss = `/* Tailwind core */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Google Font */
+  const globalStylesScss = `/* Google Font */
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap");
 
 /* Variables */
@@ -646,73 +682,88 @@ Created with ❤️ using MyProject Generator
   // ============ WRITE ALL FILES ============
 
   // Backend files
-  await fs.writeFile(path.join(base, "backend/src/config/db/index.js"), dbCode);
-  await fs.writeFile(
+  await fsExtra.writeFile(
+    path.join(base, "backend/src/config/db/index.js"),
+    dbCode
+  );
+  await fsExtra.writeFile(
     path.join(base, "backend/src/app/models/Example.js"),
     modelCode
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "backend/src/app/controllers/SiteController.js"),
     controllerCode
   );
-  await fs.writeFile(path.join(base, "backend/src/routes/site.js"), siteRoutes);
-  await fs.writeFile(
-    path.join(base, "backend/src/routes/index.js"),
+  await fsExtra.writeFile(
+    path.join(base, "backend/src/app/routes/site.js"),
+    siteRoutes
+  );
+  await fsExtra.writeFile(
+    path.join(base, "backend/src/app/routes/index.js"),
     routesIndex
   );
-  await fs.writeFile(path.join(base, "backend/src/index.js"), indexJS);
-  await fs.writeFile(path.join(base, "backend/.env"), envContent);
-  await fs.writeFile(path.join(base, "backend/.gitignore"), backendGitignore);
+  await fsExtra.writeFile(path.join(base, "backend/src/index.js"), indexJS);
+  await fsExtra.writeFile(path.join(base, "backend/.env"), envContent);
+  await fsExtra.writeFile(
+    path.join(base, "backend/.gitignore"),
+    backendGitignore
+  );
 
   // Frontend files
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(
       base,
       "frontend/src/components/Layout/components/Header/index.js"
     ),
     headerJS
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(
       base,
       "frontend/src/components/Layout/components/Footer/index.js"
     ),
     footerJS
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "frontend/src/components/Layout/DefaultLayout/index.js"),
     defaultLayoutJS
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "frontend/src/components/GlobalStyles/index.js"),
     globalStylesJS
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "frontend/src/components/GlobalStyles/GlobalStyles.scss"),
     globalStylesScss
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "frontend/src/components/GlobalStyles/_variables.scss"),
     variablesScss
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "frontend/src/pages/Home/index.js"),
     homePageJS
   );
-  await fs.writeFile(
+  await fsExtra.writeFile(
     path.join(base, "frontend/src/pages/About/index.js"),
     aboutPageJS
   );
-  await fs.writeFile(path.join(base, "frontend/src/routes/index.js"), routesJS);
-  await fs.writeFile(path.join(base, "frontend/src/App.jsx"), appJS);
-  await fs.writeFile(path.join(base, "frontend/src/main.jsx"), mainJS);
-  await fs.writeFile(path.join(base, "frontend/.gitignore"), frontendGitignore);
+  await fsExtra.writeFile(
+    path.join(base, "frontend/src/routes/index.js"),
+    routesJS
+  );
+  await fsExtra.writeFile(path.join(base, "frontend/src/App.jsx"), appJS);
+  await fsExtra.writeFile(path.join(base, "frontend/src/main.jsx"), mainJS);
+  await fsExtra.writeFile(
+    path.join(base, "frontend/.gitignore"),
+    frontendGitignore
+  );
 
   // Root files
-  await fs.writeFile(path.join(base, "README.md"), readme);
-  await fs.writeFile(path.join(base, ".gitignore"), rootGitignore);
+  await fsExtra.writeFile(path.join(base, "README.md"), readme);
+  await fsExtra.writeFile(path.join(base, ".gitignore"), rootGitignore);
 
   console.log(chalk.green("✅ Đã tạo tất cả file mẫu!"));
 }
 
-main().catch((err) => console.error(chalk.red(err)));
+main().catch((err) => console.error(chalk.red("❌ Error:", err.message)));

@@ -32,7 +32,7 @@ npm install
 Cách 2: Cài global (khuyên dùng)
 
 ```bash
-bashnpm install -g myproject-generator
+npm install -g myproject-generator
 ```
 
 Cách 3: Chạy trực tiếp với npx
