@@ -52,7 +52,7 @@ node index.js
 Hoặc nếu đã cài global:
 
 ```bash
-bashmyproject-generator
+hmyproject-generator
 ```
 
 2. Nhập tên dự án
