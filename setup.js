@@ -125,11 +125,11 @@ async function main() {
     chalk.white(`
   Backend:
     cd ${projectName}/backend
-    npm run dev
+    npm start
     
   Frontend:
     cd ${projectName}/frontend
-    npm run dev
+    npm start
   `)
   );
 }
@@ -174,6 +174,7 @@ async function setupEnvironment(projectPath) {
       version: "0.0.0",
       type: "module",
       scripts: {
+        start: "vite",
         dev: "vite",
         build: "vite build",
         preview: "vite preview",
@@ -525,9 +526,7 @@ import { Fragment } from "react";
 
 function App() {
   return (
-    <BrowserRouter 
-    future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-    >
+    <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
       <div className="App">
         <Routes>
           {publicRoutes.map((route, index) => {
@@ -594,10 +593,6 @@ export default GlobalStyles;
 
 /* Variables */
 @import "./variables";
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* Global styles */
 * {
@@ -723,11 +718,12 @@ NODE_ENV=development
 ## 📦 Available Scripts
 
 ### Backend
+- \`npm start\` - Start development server with nodemon & debugging
 - \`npm run dev\` - Start development server with nodemon
-- \`npm start\` - Start with debugging
 
 ### Frontend
-- \`npm run dev\` - Start development server
+- \`npm start\` - Start development server
+- \`npm run dev\` - Start development server (same as start)
 - \`npm run build\` - Build for production
 - \`npm run preview\` - Preview production build
 
@@ -784,23 +780,23 @@ Created with ❤️ using MyProject Generator
   await fsExtra.writeFile(
     path.join(
       base,
-      "frontend/src/components/Layout/components/Header/index.js"
+      "frontend/src/components/Layout/components/Header/index.jsx"
     ),
     headerJS
   );
   await fsExtra.writeFile(
     path.join(
       base,
-      "frontend/src/components/Layout/components/Footer/index.js"
+      "frontend/src/components/Layout/components/Footer/index.jsx"
     ),
     footerJS
   );
   await fsExtra.writeFile(
-    path.join(base, "frontend/src/components/Layout/DefaultLayout/index.js"),
+    path.join(base, "frontend/src/components/Layout/DefaultLayout/index.jsx"),
     defaultLayoutJS
   );
   await fsExtra.writeFile(
-    path.join(base, "frontend/src/components/GlobalStyles/index.js"),
+    path.join(base, "frontend/src/components/GlobalStyles/index.jsx"),
     globalStylesJS
   );
   await fsExtra.writeFile(
@@ -812,15 +808,15 @@ Created with ❤️ using MyProject Generator
     variablesScss
   );
   await fsExtra.writeFile(
-    path.join(base, "frontend/src/pages/Home/index.js"),
+    path.join(base, "frontend/src/pages/Home/index.jsx"),
     homePageJS
   );
   await fsExtra.writeFile(
-    path.join(base, "frontend/src/pages/About/index.js"),
+    path.join(base, "frontend/src/pages/About/index.jsx"),
     aboutPageJS
   );
   await fsExtra.writeFile(
-    path.join(base, "frontend/src/routes/index.js"),
+    path.join(base, "frontend/src/routes/index.jsx"),
     routesJS
   );
   await fsExtra.writeFile(path.join(base, "frontend/src/App.jsx"), appJS);
