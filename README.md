@@ -24,7 +24,7 @@ MongoDB (nếu muốn dùng database)
 Cách 1: Clone repository
 
 ```bash
-bashgit clone https://github.com/yourusername/myproject-generator.git
+git clone https://github.com/yourusername/myproject-generator.git
 cd myproject-generator
 npm install
 ```
@@ -38,7 +38,7 @@ npm install -g myproject-generator
 Cách 3: Chạy trực tiếp với npx
 
 ```bash
-bashnpx myproject-generator
+npx myproject-generator
 ```
 
 💻 Cách sử dụng
@@ -46,7 +46,7 @@ bashnpx myproject-generator
 1. Chạy tool
 
 ```bash
-bashnode index.js
+node index.js
 ```
 
 Hoặc nếu đã cài global:
