@@ -4,5 +4,8 @@
     "fs-extra": "^11.3.2",
     "inquirer": "^8.2.5"
   },
+  "scripts": {
+    "start": "node index.js"
+  },
   "type": "module"
 }
