@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-import { execSync } from "child_process";
-import path from "path";
-import { fileURLToPath } from "url";
 import fs from "fs";
+import path from "path";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+console.log("🚀 Checking dependencies...");
 
 // ============ AUTO SETUP PACKAGE.JSON ============
 const packageJsonPath = path.join(__dirname, "package.json");
@@ -19,6 +21,7 @@ const packageJsonContent = {
     chalk: "4.1.2",
     inquirer: "8.2.5",
     "fs-extra": "11.2.0",
+    ora: "5.4.1",
   },
 };
 
@@ -28,33 +31,36 @@ if (!fs.existsSync(packageJsonPath)) {
     packageJsonPath,
     JSON.stringify(packageJsonContent, null, 2)
   );
-} else {
-  // Cập nhật type: module nếu thiếu
-  const existing = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-  if (existing.type !== "module") {
-    existing.type = "module";
-    fs.writeFileSync(packageJsonPath, JSON.stringify(existing, null, 2));
-    console.log("✅ Đã thêm 'type: module' vào package.json");
-  }
 }
 
-// Kiểm tra và cài dependencies
+// Kiểm tra dependencies
 const nodeModulesPath = path.join(__dirname, "node_modules");
-if (
+const needsInstall =
   !fs.existsSync(nodeModulesPath) ||
   !fs.existsSync(path.join(nodeModulesPath, "chalk")) ||
   !fs.existsSync(path.join(nodeModulesPath, "inquirer")) ||
-  !fs.existsSync(path.join(nodeModulesPath, "fs-extra"))
-) {
-  console.log("📦 Đang cài đặt dependencies...");
-  execSync("npm install", { stdio: "inherit", cwd: __dirname });
-  console.log("✅ Hoàn tất cài đặt\n");
+  !fs.existsSync(path.join(nodeModulesPath, "fs-extra")) ||
+  !fs.existsSync(path.join(nodeModulesPath, "ora"));
+
+// ✅ FIX: Chỉ cài đặt 1 lần duy nhất, không restart
+if (needsInstall) {
+  console.log("📦 Cài đặt dependencies...");
+  try {
+    execSync("npm install", { stdio: "inherit", cwd: __dirname });
+    console.log("✅ Đã cài xong dependencies!");
+    console.log("⚠️  Vui lòng chạy lại script: node setup.js\n");
+    process.exit(0); // Thoát ra, để user tự chạy lại
+  } catch (err) {
+    console.error("❌ Lỗi khi cài dependencies:", err.message);
+    process.exit(1);
+  }
 }
 
-// ============ IMPORT DEPENDENCIES ============
-import fsExtra from "fs-extra";
-import chalk from "chalk";
-import inquirer from "inquirer";
+// ✅ Import sau khi đã có dependencies
+const fsExtra = (await import("fs-extra")).default;
+const chalk = (await import("chalk")).default;
+const inquirer = (await import("inquirer")).default;
+const ora = (await import("ora")).default;
 
 const projectCwd = process.cwd();
 
@@ -72,7 +78,7 @@ async function main() {
   const projectPath = path.join(projectCwd, projectName);
   await fsExtra.ensureDir(projectPath);
 
-  console.log(chalk.cyan("📁 Đang tạo cấu trúc thư mục..."));
+  const spinner = ora("Đang tạo cấu trúc thư mục...").start();
 
   // Danh sách thư mục
   const folders = [
@@ -94,7 +100,7 @@ async function main() {
     "frontend/src/components/Layout/components/Header",
     "frontend/src/pages",
     "frontend/src/pages/Home",
-    "frontend/src/pages/About", // ← THÊM DÒNG NÀY
+    "frontend/src/pages/About",
     "frontend/src/routes",
     "frontend/src/utils",
   ];
@@ -103,12 +109,12 @@ async function main() {
     await fsExtra.ensureDir(path.join(projectPath, folder));
   }
 
-  console.log(chalk.green("✅ Thư mục đã tạo xong."));
+  spinner.succeed("Thư mục đã tạo xong");
 
   // Tạo file code mẫu
+  spinner.start("Đang tạo file mẫu...");
   await createSampleFiles(projectPath, projectName);
-
-  console.log(chalk.cyan("\n📦 Đang khởi tạo môi trường Node.js..."));
+  spinner.succeed("File mẫu đã tạo xong");
 
   // Cài đặt môi trường
   await setupEnvironment(projectPath);
@@ -135,19 +141,17 @@ async function setupEnvironment(projectPath) {
     // 🟦 Backend
     execSync(`cd ${projectPath}/backend && npm init -y`, { stdio: "inherit" });
 
-    // Cài dependencies chính (đã thêm cors)
     execSync(
       `cd ${projectPath}/backend && npm install express mongoose dotenv cors mongoose-slug-updater`,
       { stdio: "inherit" }
     );
 
-    // Cài các dev dependencies
     execSync(
       `cd ${projectPath}/backend && npm install nodemon morgan mongoose-delete --save-dev`,
       { stdio: "inherit" }
     );
 
-    // 🧠 Thêm script "start" và "dev" tự động
+    // Thêm scripts
     const backendPkgPath = path.join(projectPath, "backend", "package.json");
     const backendPkg = fsExtra.readJsonSync(backendPkgPath);
 
@@ -157,34 +161,119 @@ async function setupEnvironment(projectPath) {
 
     fsExtra.writeJsonSync(backendPkgPath, backendPkg, { spaces: 2 });
 
-    console.log(
-      chalk.green("✅ Đã thêm script start & dev vào backend/package.json")
+    console.log(chalk.green("✅ Backend setup hoàn tất!"));
+
+    // 🟩 Frontend
+    console.log(chalk.cyan("\n🟩 Đang khởi tạo frontend..."));
+
+    // Tạo package.json cho frontend
+    const frontendPkgPath = path.join(projectPath, "frontend", "package.json");
+    const frontendPkg = {
+      name: "frontend",
+      private: true,
+      version: "0.0.0",
+      type: "module",
+      scripts: {
+        dev: "vite",
+        build: "vite build",
+        preview: "vite preview",
+      },
+      dependencies: {
+        react: "^18.2.0",
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.20.0",
+      },
+      devDependencies: {
+        "@types/react": "^18.2.43",
+        "@types/react-dom": "^18.2.17",
+        "@vitejs/plugin-react": "^4.2.1",
+        vite: "^5.0.8",
+        sass: "^1.69.5",
+        clsx: "^2.0.0",
+        tailwindcss: "^3.4.0",
+        postcss: "^8.4.32",
+        autoprefixer: "^10.4.16",
+      },
+    };
+
+    await fsExtra.writeJson(frontendPkgPath, frontendPkg, { spaces: 2 });
+
+    // Tạo vite.config.js
+    const viteConfig = `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': '/src',
+    },
+  },
+})
+`;
+    await fsExtra.writeFile(
+      path.join(projectPath, "frontend", "vite.config.js"),
+      viteConfig
     );
 
-    // 🟩 Frontend setup
-    console.log(chalk.cyan("\n🟩 Đang khởi tạo frontend với Vite + React..."));
+    // Tạo index.html
+    const indexHtml = `<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MyProject</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+`;
+    await fsExtra.writeFile(
+      path.join(projectPath, "frontend", "index.html"),
+      indexHtml
+    );
 
-    // Tạo project Vite React
-    execSync(
-      `cd ${projectPath} && npm create vite@latest frontend -- --template react`,
-      { stdio: "inherit" }
+    // Tạo tailwind.config.js
+    const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+`;
+    await fsExtra.writeFile(
+      path.join(projectPath, "frontend", "tailwind.config.js"),
+      tailwindConfig
+    );
+
+    // Tạo postcss.config.js
+    const postcssConfig = `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}
+`;
+    await fsExtra.writeFile(
+      path.join(projectPath, "frontend", "postcss.config.js"),
+      postcssConfig
     );
 
     // Cài dependencies
-    execSync(`cd ${projectPath}/frontend && npm install`, { stdio: "inherit" });
-
-    // Cài thêm các thư viện phổ biến
-    execSync(`cd ${projectPath}/frontend && npm install react-router-dom`, {
-      stdio: "inherit",
-    });
-
-    // Cài dev dependencies
-    execSync(`cd ${projectPath}/frontend && npm install sass clsx --save-dev`, {
+    console.log(chalk.cyan("📦 Đang cài đặt dependencies cho frontend..."));
+    execSync(`cd ${projectPath}/frontend && npm install`, {
       stdio: "inherit",
     });
 
     console.log(chalk.green("✅ Frontend setup hoàn tất!"));
-    console.log(chalk.green("\n✅ Đã cài đặt môi trường hoàn tất!"));
   } catch (err) {
     console.error(chalk.red("❌ Lỗi khi cài đặt môi trường:"), err);
   }
@@ -193,7 +282,6 @@ async function setupEnvironment(projectPath) {
 async function createSampleFiles(base, projectName) {
   // ============ BACKEND FILES ============
 
-  // 1. Database config
   const dbCode = `const mongoose = require("mongoose");
 
 async function connect() {
@@ -209,7 +297,6 @@ async function connect() {
 module.exports = { connect };
 `;
 
-  // 2. Model example
   const modelCode = `const mongoose = require("mongoose");
 const slug = require("mongoose-slug-updater");
 
@@ -231,7 +318,6 @@ const ExampleSchema = new Schema(
 module.exports = mongoose.model("Example", ExampleSchema);
 `;
 
-  // 3. Controller
   const controllerCode = `class SiteController {
   // [GET] /
   index(req, res, next) {
@@ -253,10 +339,9 @@ module.exports = mongoose.model("Example", ExampleSchema);
 module.exports = new SiteController();
 `;
 
-  // 4. Routes - site.js
   const siteRoutes = `const express = require("express");
 const router = express.Router();
-const siteController = require("../app/controllers/SiteController");
+const siteController = require("../controllers/SiteController");
 
 router.get("/", siteController.index);
 router.get("/about", siteController.about);
@@ -264,7 +349,6 @@ router.get("/about", siteController.about);
 module.exports = router;
 `;
 
-  // 5. Routes - index.js (main router)
   const routesIndex = `const siteRouter = require("./site");
 
 function route(app) {
@@ -279,13 +363,12 @@ function route(app) {
 module.exports = route;
 `;
 
-  // 6. Main index.js
   const indexJS = `const express = require("express");
 const morgan = require("morgan");
 const cors = require("cors");
 require("dotenv").config();
 
-const route = require("./routes");
+const route = require("./app/routes");
 const db = require("./config/db");
 
 const app = express();
@@ -308,13 +391,11 @@ app.listen(port, () => {
 });
 `;
 
-  // 7. .env file
   const envContent = `PORT=5000
 MONGODB_URI=mongodb://localhost:27017/${projectName.toLowerCase()}
 NODE_ENV=development
 `;
 
-  // 8. Backend .gitignore
   const backendGitignore = `node_modules/
 .env
 .env.local
@@ -327,7 +408,6 @@ yarn-error.log*
 
   // ============ FRONTEND FILES ============
 
-  // 1. Header component
   const headerJS = `function Header() {
   return (
     <header style={{ padding: "20px", background: "#0ea5e9", color: "white" }}>
@@ -343,7 +423,6 @@ yarn-error.log*
 export default Header;
 `;
 
-  // 2. Footer component
   const footerJS = `function Footer() {
   return (
     <footer style={{ padding: "20px", background: "#333", color: "white", textAlign: "center", marginTop: "auto" }}>
@@ -355,7 +434,6 @@ export default Header;
 export default Footer;
 `;
 
-  // 3. DefaultLayout
   const defaultLayoutJS = `import Header from "../components/Header";
 import Footer from "../components/Footer";
 
@@ -374,7 +452,6 @@ function DefaultLayout({ children }) {
 export default DefaultLayout;
 `;
 
-  // 4. Home page
   const homePageJS = `import { useState, useEffect } from "react";
 
 function Home() {
@@ -416,7 +493,6 @@ function Home() {
 export default Home;
 `;
 
-  // 5. About page
   const aboutPageJS = `function About() {
   return (
     <div>
@@ -429,7 +505,6 @@ export default Home;
 export default About;
 `;
 
-  // 6. Routes config
   const routesJS = `import Home from "../pages/Home";
 import About from "../pages/About";
 
@@ -443,7 +518,6 @@ const privateRoutes = [];
 export { publicRoutes, privateRoutes };
 `;
 
-  // 7. App.js
   const appJS = `import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { publicRoutes } from "./routes";
 import DefaultLayout from "./components/Layout/DefaultLayout";
@@ -451,7 +525,9 @@ import { Fragment } from "react";
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter 
+    future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
+    >
       <div className="App">
         <Routes>
           {publicRoutes.map((route, index) => {
@@ -485,7 +561,6 @@ function App() {
 export default App;
 `;
 
-  // 8. main.jsx (Vite uses main.jsx instead of index.js)
   const mainJS = `import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
@@ -500,7 +575,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 );
 `;
 
-  // 9. GlobalStyles
   const globalStylesJS = `import "./GlobalStyles.scss";
 
 function GlobalStyles({ children }) {
@@ -513,8 +587,17 @@ export default GlobalStyles;
   const globalStylesScss = `/* Google Font */
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap");
 
+/* Tailwind base styles */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Variables */
 @import "./variables";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Global styles */
 * {
@@ -543,7 +626,6 @@ body {
 }
 `;
 
-  // 10. Frontend .gitignore
   const frontendGitignore = `# Logs
 logs
 *.log
@@ -570,7 +652,6 @@ dist-ssr
 *.sw?
 `;
 
-  // 11. README.md
   const readme = `# ${projectName}
 
 Fullstack boilerplate project with Express (Backend) and React + Vite (Frontend).
@@ -660,18 +741,10 @@ NODE_ENV=development
 - ✅ Environment variables configuration
 - ✅ CORS enabled
 
-## 📖 Documentation
-
-- [Express.js Docs](https://expressjs.com/)
-- [React Docs](https://react.dev/)
-- [Vite Docs](https://vitejs.dev/)
-- [MongoDB Docs](https://www.mongodb.com/docs/)
-
 ---
 Created with ❤️ using MyProject Generator
 `;
 
-  // 12. Root .gitignore
   const rootGitignore = `node_modules/
 .DS_Store
 *.log
@@ -681,7 +754,6 @@ Created with ❤️ using MyProject Generator
 
   // ============ WRITE ALL FILES ============
 
-  // Backend files
   await fsExtra.writeFile(
     path.join(base, "backend/src/config/db/index.js"),
     dbCode
@@ -709,7 +781,6 @@ Created with ❤️ using MyProject Generator
     backendGitignore
   );
 
-  // Frontend files
   await fsExtra.writeFile(
     path.join(
       base,
@@ -759,11 +830,8 @@ Created with ❤️ using MyProject Generator
     frontendGitignore
   );
 
-  // Root files
   await fsExtra.writeFile(path.join(base, "README.md"), readme);
   await fsExtra.writeFile(path.join(base, ".gitignore"), rootGitignore);
-
-  console.log(chalk.green("✅ Đã tạo tất cả file mẫu!"));
 }
 
 main().catch((err) => console.error(chalk.red("❌ Error:", err.message)));
